@@ -52,6 +52,9 @@ const AppContent: React.FC = () => {
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'character' | 'house' | 'environment'>('character');
   
+  // 모달 상태
+  const [showCaptureModal, setShowCaptureModal] = useState<boolean>(false);
+  
   // Web3 컨텍스트 연결
   const { account, connectWallet, isConnected, isConnecting, mintNFT } = useWeb3();
   
@@ -461,25 +464,40 @@ const AppContent: React.FC = () => {
   // 땅 색상 계산
   const groundColor = getGroundColor(groundStyle);
 
+  // NFT 캡처 모달 열기
+  const openCaptureModal = () => {
+    setShowCaptureModal(true);
+    // 모달을 열 때 바로 캡처 시도
+    handleCaptureNow();
+  };
+
+  // NFT 캡처 모달 닫기
+  const closeCaptureModal = () => {
+    setShowCaptureModal(false);
+    // 모달을 닫을 때 캡처 미리보기 초기화
+    setCapturedPreview(null);
+  };
+
   return (
-    <div className="app">
+    <div className="game-page">
       <header className="game-header">
-        <h1>블록 캐릭터 홈</h1>
+        <h1>NFT 발행 테스트</h1>
         {isConnected ? (
           <div className="wallet-info">
-            <span>연결됨: {account?.slice(0, 6)}...{account?.slice(-4)}</span>
+            <div className="wallet-indicator"></div>
+            <span>{account?.slice(0, 6)}...{account?.slice(-4)}</span>
           </div>
         ) : (
           <button 
-            className="connect-wallet-button"
-            onClick={connectWallet}
+            className="connect-wallet-button" 
+            onClick={connectWallet} 
             disabled={isConnecting}
           >
-            {isConnecting ? '연결 중...' : 'MetaMask 연결'}
+            {isConnecting ? '연결 중...' : '지갑 연결'}
           </button>
         )}
       </header>
-      
+
       <main className="game-content">
         <div className="game-scene" ref={gameSceneRef} style={{ background: environmentProps.backgroundColor }}>
           <Canvas ref={canvasRef}>
@@ -498,8 +516,8 @@ const AppContent: React.FC = () => {
             <OrbitControls 
               enableZoom={true} 
               enablePan={false}
-              minDistance={3}
-              maxDistance={10}
+              minDistance={4}
+              maxDistance={12}
               maxPolarAngle={Math.PI / 2}
               target={[0, 0, 0]}
               makeDefault
@@ -508,8 +526,8 @@ const AppContent: React.FC = () => {
             {/* 기본 카메라 설정 - 정면에서 약간 위에서 보는 각도 */}
             <PerspectiveCamera 
               makeDefault 
-              position={[0, 1, 5]} 
-              fov={50}
+              position={[0, 2, 8]} 
+              fov={45}
             />
             
             {/* 환경 효과 추가 - 날씨에 따라 조절 */}
@@ -547,45 +565,30 @@ const AppContent: React.FC = () => {
           </Canvas>
         </div>
         
-        {/* 화면 캡처 UI를 캐릭터 화면 아래로 이동 */}
-        <div className="capture-section">
-          <div className="capture-controls">
-            <button 
-              className="capture-button" 
-              onClick={handleCaptureNow}
-            >
-              현재 화면 캡처하기
-            </button>
-            <p className="capture-help">원하는 각도로 조절 후 캡처하세요</p>
-          </div>
-        
-          {capturedPreview && (
-            <div className="image-preview">
-              <img src={capturedPreview} alt="캡처된 이미지" className="preview-image" />
-            </div>
-          )}
-        </div>
-        
         <div className="customization-container">
           <div className="customization-panel">
+            <div className="panel-header">
+              <h2>커스텀</h2>
+            </div>
+            
             <div className="tabs">
               <button
                 className={`tab-button ${activeTab === 'character' ? 'active' : ''}`}
                 onClick={() => setActiveTab('character')}
               >
-                캐릭터 꾸미기
+                캐릭터
               </button>
               <button
                 className={`tab-button ${activeTab === 'house' ? 'active' : ''}`}
                 onClick={() => setActiveTab('house')}
               >
-                집 꾸미기
+                집
               </button>
               <button
                 className={`tab-button ${activeTab === 'environment' ? 'active' : ''}`}
                 onClick={() => setActiveTab('environment')}
               >
-                환경 설정
+                환경
               </button>
             </div>
             
@@ -593,7 +596,22 @@ const AppContent: React.FC = () => {
               {activeTab === 'character' ? (
                 <div className="character-customization">
                   <div className="customization-section">
-                    <h3>캐릭터 스타일</h3>
+                    <h3>색상</h3>
+                    <div className="color-options">
+                      {characterColors.map((color) => (
+                        <div
+                          key={color}
+                          className={`color-option ${characterColor === color ? 'selected' : ''}`}
+                          style={{ backgroundColor: color }}
+                          onClick={() => setCharacterColor(color as any)}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div className="customization-section">
+                    <h3>스타일</h3>
                     <div className="style-options">
                       {characterStyles.map((style) => (
                         <button
@@ -610,7 +628,7 @@ const AppContent: React.FC = () => {
                   </div>
                   
                   <div className="customization-section">
-                    <h3>캐릭터 표정</h3>
+                    <h3>표정</h3>
                     <div className="expression-options">
                       {expressionTypes.map((expr) => (
                         <button
@@ -624,21 +642,6 @@ const AppContent: React.FC = () => {
                            expr === 'angry' ? '화남' :
                            expr === 'surprised' ? '놀람' : '무표정'}
                         </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>캐릭터 색상</h3>
-                    <div className="color-options">
-                      {characterColors.map((color) => (
-                        <div
-                          key={color}
-                          className={`color-option ${characterColor === color ? 'selected' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setCharacterColor(color as any)}
-                          title={color}
-                        />
                       ))}
                     </div>
                   </div>
@@ -768,7 +771,6 @@ const AppContent: React.FC = () => {
                     </div>
                   </div>
                   
-                  {/* 땅 스타일 선택 추가 */}
                   <div className="customization-section">
                     <h3>땅 스타일</h3>
                     <div className="ground-options">
@@ -813,130 +815,78 @@ const AppContent: React.FC = () => {
               )}
             </div>
           </div>
+          
+          <div className="panel-footer">
+            <button className="nft-button" onClick={openCaptureModal}>
+              NFT 발행하기
+            </button>
+          </div>
         </div>
         
-        <div className="note">
-          <p>
-            캐릭터와 집을 원하는 대로 커스터마이징한 후, 
-            MetaMask 지갑과 연결하여 NFT로 민팅할 수 있습니다.
-          </p>
-          
-          <div className="minting-section">
-            {mintStatus === 'success' && mintResult?.tokenId ? (
-              <div className="success-message">
-                <h3>🎉 NFT 민팅 성공! 🎉</h3>
-                <p>토큰 ID: {mintResult.tokenId}</p>
-                
-                <div className="nft-info">
-                  <h4>NFT 정보</h4>
-                  
-                  {mintResult.imageHttpUrl && (
-                    <div className="nft-preview">
-                      <img 
-                        src={mintResult.imageHttpUrl} 
-                        alt="NFT 이미지" 
-                        className="nft-image-preview"
-                        onError={(e) => {
-                          // 이미지 로드 실패 시 다른 게이트웨이 시도
-                          const target = e.target as HTMLImageElement;
-                          if (target.src.includes('gateway.pinata.cloud')) {
-                            console.log('Pinata 게이트웨이 실패, IPFS.io 시도 중...');
-                            target.src = mintResult.imageUrl?.replace('ipfs://', 'https://ipfs.io/ipfs/') || '';
-                          } else if (target.src.includes('ipfs.io')) {
-                            console.log('IPFS.io 게이트웨이 실패, Infura 시도 중...');
-                            target.src = mintResult.imageUrl?.replace('ipfs://', 'https://ipfs.infura.io/ipfs/') || '';
-                          }
-                        }}
-                      />
+        {/* 모달 수정: showCaptureModal 상태를 사용하도록 변경 */}
+        {showCaptureModal && (
+          <div className="custom-modal">
+            <div className="modal-content">
+              <button className="close-button" onClick={closeCaptureModal}>×</button>
+              
+              <div className="modal-header">
+                <h2>NFT 발행</h2>
+              </div>
+              
+              <div className="capture-modal">
+                <div className="preview-container">
+                  {capturedPreview ? (
+                    <img src={capturedPreview} alt="캡처된 NFT 이미지" className="preview-image" />
+                  ) : (
+                    <div className="loading-preview">
+                      <div className="loading-spinner"></div>
+                      <p>이미지 캡처 중...</p>
                     </div>
                   )}
                   
-                  <div className="nft-details">
-                    <p><strong>컨트랙트 주소:</strong> <span className="contract-address">{process.env.REACT_APP_NFT_CONTRACT_ADDRESS}</span></p>
-                    <p><strong>토큰 ID:</strong> <span className="token-id">{mintResult.tokenId}</span></p>
+                  <div className="modal-actions">
+                    <button className="capture-button" onClick={handleCaptureNow}>
+                      다시 캡처하기
+                    </button>
                     
-                    <div className="url-info">
-                      <p><strong>메타데이터 URL:</strong></p>
-                      <p className="metadata-url">{mintResult.metadataUrl}</p>
-                      <p><strong>이미지 URL (IPFS):</strong></p>
-                      <p className="image-url">{mintResult.imageUrl}</p>
-                      {mintResult.imageHttpUrl && (
+                    <button 
+                      className="mint-button" 
+                      onClick={handleMintNFT} 
+                      disabled={isMinting || !isConnected || !capturedPreview}
+                    >
+                      {isMinting ? (
                         <>
-                          <p><strong>이미지 URL (HTTP):</strong></p>
-                          <p className="image-url">{mintResult.imageHttpUrl}</p>
+                          <div className="loading-spinner"></div>
+                          {getMintStatusMessage()}
                         </>
+                      ) : !isConnected ? (
+                        '지갑 연결 필요'
+                      ) : !capturedPreview ? (
+                        '캡처 필요'
+                      ) : (
+                        'NFT 발행하기'
                       )}
-                    </div>
-                    
-                    <div className="gateway-links">
-                      <p><strong>이미지 직접 확인:</strong></p>
-                      <div className="image-links">
-                        <a href={mintResult.imageHttpUrl} target="_blank" rel="noopener noreferrer">Pinata</a> | 
-                        <a href={mintResult.imageUrl?.replace('ipfs://', 'https://ipfs.io/ipfs/')} target="_blank" rel="noopener noreferrer"> IPFS.io</a> | 
-                        <a href={mintResult.imageUrl?.replace('ipfs://', 'https://ipfs.infura.io/ipfs/')} target="_blank" rel="noopener noreferrer"> Infura</a>
-                      </div>
-                    </div>
+                    </button>
                   </div>
                 </div>
                 
-                <div className="troubleshooting-info">
-                  <p className="help-text">MetaMask에서 NFT 이미지가 표시되지 않나요?</p>
-                  <ul className="nft-tips">
-                    <li><strong>1단계:</strong> MetaMask 앱을 열고 <strong>NFT 탭</strong>으로 이동하세요.</li>
-                    <li><strong>2단계:</strong> 화면 하단의 <strong>NFT 가져오기</strong> 버튼을 탭하세요.</li>
-                    <li><strong>3단계:</strong> 주소 필드에 <strong>{process.env.REACT_APP_NFT_CONTRACT_ADDRESS}</strong>를 입력하세요.</li>
-                    <li><strong>4단계:</strong> ID 필드에 <strong>{mintResult.tokenId}</strong>를 입력하세요.</li>
-                    <li><strong>5단계:</strong> <strong>NFT 가져오기</strong> 버튼을 탭하세요.</li>
-                    
-                    <li className="important-tip">
-                      <strong>메타데이터 팁:</strong> MetaMask는 HTTP 이미지 URL을 선호합니다. 이 NFT의 메타데이터에는 HTTP 이미지 URL이 사용되어 있어 MetaMask에서도 이미지가 잘 표시될 것입니다.
-                    </li>
-                    
-                    <li className="important-tip">
-                      <strong>이미지가 보이지 않는 경우:</strong> IPFS 네트워크에 이미지가 전파되는 데 시간이 필요합니다. 몇 분 후에 다시 확인하세요. 또는 NFT를 다시 가져와보세요.
-                    </li>
-                    
-                    <li className="important-tip">
-                      <strong>MetaMask 캐시 지우기:</strong> MetaMask 설정 {'>'} 고급 {'>'} 계정 데이터 지우기 {'>'} NFT 데이터 초기화를 선택한 후 다시 NFT를 가져오세요.
-                    </li>
-                  </ul>
-                </div>
+                {mintStatus === 'success' && mintResult?.tokenId && (
+                  <div className="success-message">
+                    <h3>민팅 성공!</h3>
+                    <p>토큰 ID: {mintResult.tokenId}</p>
+                  </div>
+                )}
                 
-                <button 
-                  className="mint-button again" 
-                  onClick={() => {
-                    setCapturedPreview(null);
-                    setMintStatus('idle');
-                    setMintResult(null);
-                  }}
-                >
-                  다른 NFT 만들기
-                </button>
+                {mintStatus === 'error' && (
+                  <div className="error-message">
+                    <h3>오류 발생</h3>
+                    <p>{mintResult?.error}</p>
+                  </div>
+                )}
               </div>
-            ) : mintStatus === 'error' ? (
-              <div className="error-message">
-                <h3>❌ 오류 발생</h3>
-                <p>{mintResult?.error}</p>
-                <button className="mint-button retry" onClick={handleMintNFT}>
-                  다시 시도
-                </button>
-              </div>
-            ) : (
-              <button 
-                className="mint-button" 
-                onClick={handleMintNFT}
-                disabled={isMinting || !isConnected}
-              >
-                {!isConnected ? '지갑 연결 후 NFT 민팅하기' : 
-                 isMinting ? getMintStatusMessage() : 'NFT 민팅하기'}
-              </button>
-            )}
-            
-            {isMinting && (
-              <div className="loading-spinner"></div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
       </main>
     </div>
   );
@@ -947,7 +897,9 @@ const App: React.FC = () => {
   return (
     <Web3Provider>
       <GameProvider>
-        <AppContent />
+        <div className="app">
+          <AppContent />
+        </div>
       </GameProvider>
     </Web3Provider>
   );

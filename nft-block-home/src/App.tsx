@@ -28,6 +28,8 @@ const AppContent: React.FC = () => {
   const [showExpGain, setShowExpGain] = useState<boolean>(false);
   const [expGainAmount, setExpGainAmount] = useState<number>(0);
   const [isPetting, setIsPetting] = useState<boolean>(false); // 쓰다듬기 애니메이션 상태
+  const [isFeeding, setIsFeeding] = useState<boolean>(false); // 먹이주기 애니메이션 상태
+  const [showFood, setShowFood] = useState<boolean>(false); // 먹이 표시 상태
   
   // 집 상태
   const [houseStyle, setHouseStyle] = useState<'modern' | 'classic' | 'cottage' | 'castle' | 'futuristic'>('modern');
@@ -406,14 +408,29 @@ const AppContent: React.FC = () => {
   
   // 먹이주기 함수
   const feedSlime = () => {
-    if (feedCount < maxTaskCount) {
-      const newFeedCount = feedCount + 1;
-      setFeedCount(newFeedCount);
+    if (feedCount < maxTaskCount && !isFeeding) {
+      // 먹이 표시
+      setShowFood(true);
       
-      // 미션 완료시에만 경험치 획득
-      if (newFeedCount === maxTaskCount) {
-        gainExperience(90); // 먹이주기 미션 완료시 90 경험치 획득
-      }
+      // 먹이주기 애니메이션 시작
+      setTimeout(() => {
+        setIsFeeding(true);
+        setShowFood(false);
+        
+        // 애니메이션 종료 후 카운터 증가
+        setTimeout(() => {
+          const newFeedCount = feedCount + 1;
+          setFeedCount(newFeedCount);
+          
+          // 애니메이션 상태 초기화
+          setIsFeeding(false);
+          
+          // 미션 완료시에만 경험치 획득
+          if (newFeedCount === maxTaskCount) {
+            gainExperience(90); // 먹이주기 미션 완료시 90 경험치 획득
+          }
+        }, 800);
+      }, 500);
     }
   };
 
@@ -459,12 +476,15 @@ const AppContent: React.FC = () => {
         <div className="game-scene" ref={gameSceneRef} style={{ background: environmentProps.backgroundColor }}>
           <div className="slime-image-container">
             <img 
-              src="/silme.png" 
+              src="/slimeD.gif" 
               alt="Slime Character" 
-              className={`slime-image ${isPetting ? 'petting' : ''}`}
+              className={`slime-image ${isPetting ? 'petting' : ''} ${isFeeding ? 'feeding' : ''}`}
               onClick={petSlime}
               style={{ cursor: petCount >= maxTaskCount ? 'default' : 'pointer' }}
             />
+            {showFood && (
+              <div className="food-item"></div>
+            )}
             {showExpGain && (
               <div className="exp-gain-animation">
                 +{expGainAmount} EXP
@@ -473,7 +493,7 @@ const AppContent: React.FC = () => {
             <button 
               className="feed-button" 
               onClick={feedSlime} 
-              disabled={feedCount >= maxTaskCount}
+              disabled={feedCount >= maxTaskCount || isFeeding}
             >
               먹이주기
             </button>

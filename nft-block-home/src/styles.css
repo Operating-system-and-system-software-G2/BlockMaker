@@ -119,12 +119,34 @@ body {
   animation: petting 0.3s ease;
 }
 
+.slime-image.feeding {
+  animation: feeding 0.8s ease;
+}
+
 @keyframes petting {
   0% {
     transform: scale(1);
   }
   50% {
     transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes feeding {
+  0% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1);
+  }
+  50% {
+    transform: scale(0.95);
+  }
+  75% {
+    transform: scale(1.05);
   }
   100% {
     transform: scale(1);
@@ -145,10 +167,18 @@ body {
   cursor: pointer;
   transition: var(--transition);
   z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .feed-button:hover {
   background-color: #5ab9df;
+  transform: translateY(-2px);
+  box-shadow: 0 7px 14px rgba(0, 0, 0, 0.1), 0 3px 6px rgba(0, 0, 0, 0.08);
+}
+
+.feed-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 .feed-button:disabled {
@@ -180,6 +210,34 @@ body {
   100% {
     opacity: 0;
     transform: translateY(-40px);
+  }
+}
+
+.food-item {
+  position: absolute;
+  width: 30px;
+  height: 30px;
+  background-color: #ff9800;
+  border-radius: 50%;
+  top: 45%;
+  left: 50%;
+  margin-left: -15px;
+  z-index: 20;
+  animation: food-fall 0.5s ease-in forwards;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes food-fall {
+  0% {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
   }
 }
 

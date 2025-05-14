@@ -9,7 +9,7 @@ import './styles.css';
 // 실제 App 컴포넌트
 const AppContent: React.FC = () => {
   // 캐릭터 상태
-  const [characterColor, setCharacterColor] = useState<'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'white' | 'black'>('blue');
+  const [characterColor, setCharacterColor] = useState<'pastel-blue' | 'pastel-pink' | 'pastel-green' | 'pastel-yellow' | 'pastel-purple'>('pastel-blue');
   const [accessory, setAccessory] = useState<'none' | 'hat' | 'glasses' | 'necklace'>('none');
   const [accessoryColor, setAccessoryColor] = useState<'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'white' | 'black'>('red');
   const [characterStyle, setCharacterStyle] = useState<'normal' | 'slim' | 'chubby' | 'tall'>('normal');
@@ -103,7 +103,7 @@ const AppContent: React.FC = () => {
   };
   
   // 색상 옵션 배열
-  const characterColors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'white', 'black'];
+  const characterColors = ['pastel-blue', 'pastel-pink', 'pastel-green', 'pastel-yellow', 'pastel-purple'];
   const houseColors = ['brown', 'white', 'gray', 'blue', 'red', 'green'];
   const accessoryTypes = ['none', 'hat', 'glasses', 'necklace'];
   const houseStyles = ['modern', 'classic', 'cottage', 'castle', 'futuristic'];
@@ -478,7 +478,7 @@ const AppContent: React.FC = () => {
             <img 
               src="/slimeD.gif" 
               alt="Slime Character" 
-              className={`slime-image ${isPetting ? 'petting' : ''} ${isFeeding ? 'feeding' : ''}`}
+              className={`slime-image ${isPetting ? 'petting' : ''} ${isFeeding ? 'feeding' : ''} slime-${characterColor}`}
               onClick={petSlime}
               style={{ cursor: petCount >= maxTaskCount ? 'default' : 'pointer' }}
             />
@@ -518,7 +518,7 @@ const AppContent: React.FC = () => {
                 className={`tab-button ${activeTab === 'house' ? 'active' : ''}`}
                 onClick={() => setActiveTab('house')}
               >
-                Custom
+                custom
               </button>
               <button
                 className={`tab-button ${activeTab === 'environment' ? 'active' : ''}`}
@@ -574,59 +574,22 @@ const AppContent: React.FC = () => {
               ) : activeTab === 'house' ? (
                 <div className="house-customization">
                   <div className="customization-section">
-                    <h3>집 스타일</h3>
-                    <div className="style-options">
-                      {houseStyles.map((style) => (
-                        <button
-                          key={style}
-                          className={`style-option ${houseStyle === style ? 'selected' : ''}`}
-                          onClick={() => setHouseStyle(style as any)}
-                        >
-                          {style === 'modern' ? '모던' : 
-                           style === 'classic' ? '클래식' : 
-                           style === 'cottage' ? '코티지' :
-                           style === 'castle' ? '성' : '미래적'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>집 색상</h3>
-                    <div className="color-options">
-                      {houseColors.map((color) => (
-                        <div
-                          key={color}
-                          className={`color-option ${houseColor === color ? 'selected' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setHouseColor(color as any)}
-                          title={color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>장식품</h3>
-                    <div className="decoration-options">
-                      {decorationOptions.map((decoration) => (
-                        <label key={decoration} className="decoration-option">
-                          <input
-                            type="checkbox"
-                            checked={decorations.includes(decoration)}
-                            onChange={() => toggleDecoration(decoration)}
+                    <h3>슬라임 색상</h3>
+                    <div className="color-selection-container">
+                      <div className="color-options">
+                        {characterColors.map((color) => (
+                          <div
+                            key={color}
+                            className={`color-option ${characterColor === color ? 'selected' : ''}`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setCharacterColor(color as any)}
+                            title={color}
                           />
-                          {decoration === 'garden' ? '정원' : 
-                           decoration === 'fence' ? '울타리' : 
-                           decoration === 'pool' ? '수영장' :
-                           decoration === 'trees' ? '나무' : '꽃'}
-                        </label>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="environment-customization">
+                  
                   <div className="customization-section">
                     <h3>시간대</h3>
                     <div className="time-options">
@@ -643,63 +606,46 @@ const AppContent: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div className="environment-customization">
+                  <h3 className="shop-title">액세서리 상점</h3>
                   
-                  <div className="customization-section">
-                    <h3>날씨</h3>
-                    <div className="weather-options">
-                      {weatherOptions.map((type) => (
-                        <button
-                          key={type}
-                          className={`weather-option ${weather === type ? 'selected' : ''}`}
-                          onClick={() => setWeather(type as any)}
-                          value={type}
-                        >
-                          {type === 'clear' ? '맑음' : 
-                           type === 'rainy' ? '비' : 
-                           type === 'snowy' ? '눈' : '안개'}
-                        </button>
-                      ))}
+                  <div className="shop-items">
+                    <div className="shop-item">
+                      <div className="shop-item-image hat-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">모자</div>
+                        <div className="shop-item-price">50 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
                     </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>땅 스타일</h3>
-                    <div className="ground-options">
-                      <button 
-                        className={`ground-option ${groundStyle === 'grass' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('grass')}
-                        value="grass"
-                      >
-                        잔디
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'dirt' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('dirt')}
-                        value="dirt"
-                      >
-                        흙
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'sand' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('sand')}
-                        value="sand"
-                      >
-                        모래
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'snow' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('snow')}
-                        value="snow"
-                      >
-                        눈
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'stone' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('stone')}
-                        value="stone"
-                      >
-                        돌
-                      </button>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image glasses-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">안경</div>
+                        <div className="shop-item-price">30 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
+                    </div>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image sword-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">픽셀 검</div>
+                        <div className="shop-item-price">100 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
+                    </div>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image shield-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">방패</div>
+                        <div className="shop-item-price">80 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
                     </div>
                   </div>
                 </div>

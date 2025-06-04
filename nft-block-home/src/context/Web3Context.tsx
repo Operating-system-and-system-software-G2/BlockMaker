@@ -80,13 +80,26 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
       const networkIdNumber = typeof networkId === 'bigint' ? Number(networkId) : Number(networkId);
       setNetwork(getNetworkName(networkIdNumber));
 
+      // 디버깅 로그 추가
+      console.log('NFT_CONTRACT_ADDRESS:', NFT_CONTRACT_ADDRESS);
+      console.log('NFT_CONTRACT_ADDRESS 유효성:', Boolean(NFT_CONTRACT_ADDRESS));
+      console.log('현재 네트워크:', getNetworkName(networkIdNumber));
+
       // NFT 컨트랙트 연결
       if (NFT_CONTRACT_ADDRESS) {
-        const _contract = new _web3.eth.Contract(
-          BlockNFTAbi as AbiItem[],
-          NFT_CONTRACT_ADDRESS
-        );
-        setContract(_contract);
+        console.log('ABI 타입:', typeof BlockNFTAbi);
+        console.log('ABI 구조:', BlockNFTAbi ? 'ABI 존재' : 'ABI 미존재');
+        
+        try {
+          const _contract = new _web3.eth.Contract(
+            BlockNFTAbi as AbiItem[],
+            NFT_CONTRACT_ADDRESS
+          );
+          console.log('컨트랙트 초기화 성공:', Boolean(_contract));
+          setContract(_contract);
+        } catch (contractError) {
+          console.error('컨트랙트 초기화 오류:', contractError);
+        }
       }
     } catch (err: any) {
       console.error('계정 데이터 로드 오류:', err);
@@ -179,10 +192,49 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
       console.warn('토큰 URI가 ipfs:// 형식이 아닙니다. 현재 URI:', tokenURI);
     }
     console.log(`토큰 URI: ${tokenURI}`);
+    
+    // 컨트랙트의 모든 메서드 로깅 (디버깅용)
+    try {
+      console.log('컨트랙트 메서드 확인:');
+      const methods = Object.keys(contract.methods);
+      console.log('- 사용 가능한 메서드:', methods);
+      
+      // mintCharacter 메서드 존재 확인
+      if (!contract.methods.mintCharacter) {
+        console.error('mintCharacter 메서드가 컨트랙트에 존재하지 않습니다!');
+        
+        // 대안 찾기
+        if (contract.methods.mintNFT) {
+          console.log('대안 메서드 찾음: mintNFT - 이것을 사용합니다');
+        } else if (contract.methods.mint) {
+          console.log('대안 메서드 찾음: mint - 이것을 사용합니다');
+        } else {
+          console.error('적합한 민팅 메서드를 찾을 수 없습니다!');
+          throw new Error('적합한 민팅 메서드를 찾을 수 없습니다. 컨트랙트 ABI를 확인해주세요.');
+        }
+      }
+    } catch (err) {
+      console.warn('컨트랙트 메서드 확인 중 오류:', err);
+    }
 
     try {
+      // 컨트랙트에 따라 적절한 민팅 메서드 선택
+      let mintMethod;
+      if (contract.methods.mintCharacter) {
+        console.log('mintCharacter 메서드 사용');
+        mintMethod = contract.methods.mintCharacter(account, tokenURI);
+      } else if (contract.methods.mintNFT) {
+        console.log('mintNFT 메서드 사용');
+        mintMethod = contract.methods.mintNFT(account, tokenURI);
+      } else if (contract.methods.mint) {
+        console.log('mint 메서드 사용');
+        mintMethod = contract.methods.mint(account, tokenURI);
+      } else {
+        throw new Error('적합한 민팅 메서드를 찾을 수 없습니다');
+      }
+      
       // gas 추정
-      const gasEstimate = await contract.methods.mintNFT(account, tokenURI).estimateGas({ from: account });
+      const gasEstimate = await mintMethod.estimateGas({ from: account });
       console.log(`가스 추정값: ${gasEstimate}`);
       
       // BigInt 타입 에러를 방지하기 위해 숫자 타입으로 변환
@@ -195,7 +247,7 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
 
       // 민팅 트랜잭션 전송
       console.log("트랜잭션 전송 중...");
-      const receipt = await contract.methods.mintNFT(account, tokenURI).send({
+      const receipt = await mintMethod.send({
         from: account,
         gas: gasEstimateNumber + 50000 // 추가 가스 제공
       });

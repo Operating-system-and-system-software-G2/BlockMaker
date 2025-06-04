@@ -1,43 +1,37 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, PerspectiveCamera } from '@react-three/drei';
-import * as THREE from 'three';
-import BlockCharacter from './components/BlockCharacter';
-import BlockHouse from './components/BlockHouse';
 import { useWeb3 } from './context/Web3Context';
 import { Web3Provider } from './context/Web3Context';
 import { GameProvider } from './context/GameContext';
 import html2canvas from 'html2canvas';
 import { uploadImageToIPFS, uploadMetadataToIPFS, PUBLIC_IPFS_GATEWAY, BACKUP_IPFS_GATEWAY, INFURA_IPFS_GATEWAY } from './utils/ipfs';
-import { Decoration } from './models/House';
-import { RainEffect, SnowEffect, FogEffect } from './components/EnvironmentEffects';
-import Ground from './components/Ground';
 import './styles.css';
-
-// Three.js 캔버스 캡처를 위한 헬퍼 컴포넌트
-interface SceneCaptureProps {
-  onCaptureRef: (refs: { gl: THREE.WebGLRenderer; scene: THREE.Scene; camera: THREE.Camera }) => void;
-}
-
-const SceneCapture: React.FC<SceneCaptureProps> = ({ onCaptureRef }) => {
-  const { gl, scene, camera } = useThree();
-  
-  React.useEffect(() => {
-    // gl, scene, camera 참조를 상위 컴포넌트에 전달
-    onCaptureRef({ gl, scene, camera });
-  }, [gl, scene, camera, onCaptureRef]);
-  
-  return null;
-};
-
+// 개발자 콘솔에서 환경변수 확인
+console.log(process.env.REACT_APP_PINATA_API_KEY);
+console.log(process.env.REACT_APP_PINATA_SECRET_API_KEY);
 // 실제 App 컴포넌트
 const AppContent: React.FC = () => {
   // 캐릭터 상태
-  const [characterColor, setCharacterColor] = useState<'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'white' | 'black'>('blue');
+  const [characterColor, setCharacterColor] = useState<'pastel-blue' | 'pastel-pink' | 'pastel-green' | 'pastel-yellow' | 'pastel-purple'>('pastel-blue');
   const [accessory, setAccessory] = useState<'none' | 'hat' | 'glasses' | 'necklace'>('none');
   const [accessoryColor, setAccessoryColor] = useState<'red' | 'blue' | 'green' | 'yellow' | 'purple' | 'orange' | 'white' | 'black'>('red');
   const [characterStyle, setCharacterStyle] = useState<'normal' | 'slim' | 'chubby' | 'tall'>('normal');
   const [expression, setExpression] = useState<'happy' | 'sad' | 'angry' | 'surprised' | 'neutral'>('happy');
+  
+  // 레벨 상태
+  const [level, setLevel] = useState<number>(0);
+  const [experience, setExperience] = useState<number>(0); 
+  const expNeededForNextLevel = 100; // 다음 레벨로 가기 위해 필요한 경험치
+  const expProgress = (experience / expNeededForNextLevel) * 100; // 경험치 진행률 백분율
+  
+  // 작업 상태
+  const [petCount, setPetCount] = useState<number>(0); // 쓰다듬기 횟수
+  const [feedCount, setFeedCount] = useState<number>(0); // 먹이주기 횟수
+  const maxTaskCount = 3; // 각 작업당 최대 횟수
+  const [showExpGain, setShowExpGain] = useState<boolean>(false);
+  const [expGainAmount, setExpGainAmount] = useState<number>(0);
+  const [isPetting, setIsPetting] = useState<boolean>(false); // 쓰다듬기 애니메이션 상태
+  const [isFeeding, setIsFeeding] = useState<boolean>(false); // 먹이주기 애니메이션 상태
+  const [showFood, setShowFood] = useState<boolean>(false); // 먹이 표시 상태
   
   // 집 상태
   const [houseStyle, setHouseStyle] = useState<'modern' | 'classic' | 'cottage' | 'castle' | 'futuristic'>('modern');
@@ -77,67 +71,14 @@ const AppContent: React.FC = () => {
   const gameSceneRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
-  // Three.js 캡처 관련 상태
-  interface ThreeCaptureRefs {
-    gl: THREE.WebGLRenderer;
-    scene: THREE.Scene;
-    camera: THREE.Camera;
-  }
-  
-  const [threeCapture, setThreeCapture] = useState<ThreeCaptureRefs | null>(null);
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
-  
-  // Three.js 캡처 참조 콜백
-  const handleCaptureRef = useCallback((refs: ThreeCaptureRefs) => {
-    setThreeCapture(refs);
-  }, []);
   
   // 이미지 캡처 함수
   const captureImage = async (): Promise<File> => {
     console.log('이미지 캡처 시작...');
     
-    // Three.js 렌더러를 통해 직접 캡처
-    if (threeCapture && threeCapture.gl && threeCapture.scene && threeCapture.camera) {
-      console.log('Three.js 렌더러로 직접 캡처 시도...');
-      const { gl, scene, camera } = threeCapture;
-      
-      // 현재 카메라 상태를 그대로 사용 (사용자가 조정한 시점)
-      console.log('현재 카메라 위치:', camera.position);
-      console.log('현재 카메라 회전:', camera.rotation);
-      
-      // 원본 캔버스 비율 유지
-      const originalSize = gl.getSize(new THREE.Vector2());
-      const aspectRatio = originalSize.width / originalSize.height;
-      
-      // 고해상도 캡처를 위한 크기 설정 (비율 유지)
-      const captureWidth = 1024;
-      const captureHeight = Math.round(captureWidth / aspectRatio);
-      
-      // 임시로 크기 조정하여 고해상도 캡처
-      gl.setSize(captureWidth, captureHeight);
-      gl.render(scene, camera);
-      
-      // 캔버스에서 이미지 데이터 추출
-      const imgData = gl.domElement.toDataURL('image/png');
-      
-      // 원래 크기로 복원하고 다시 렌더링
-      gl.setSize(originalSize.width, originalSize.height);
-      gl.render(scene, camera);
-      
-      // 캡처 미리보기 설정
-      setCapturedPreview(imgData);
-      
-      // 이미지를 파일로 변환
-      const res = await fetch(imgData);
-      const blob = await res.blob();
-      const filename = `BlockCharacter_${new Date().getTime()}.png`;
-      console.log('Three.js 렌더러로 직접 캡처 완료:', filename);
-      
-      return new File([blob], filename, { type: 'image/png' });
-    }
-    
-    // 폴백: html2canvas를 사용한 캡처
-    console.log('html2canvas로 폴백 캡처 시도...');
+    // 3D 캡처 대신 html2canvas를 사용한 캡처
+    console.log('html2canvas로 캡처 시도...');
     if (!gameSceneRef.current) {
       throw new Error("게임 화면을 찾을 수 없습니다.");
     }
@@ -157,14 +98,14 @@ const AppContent: React.FC = () => {
     
     const res = await fetch(imgData);
     const blob = await res.blob();
-    const filename = `BlockCharacter_${new Date().getTime()}.png`;
+    const filename = `SlimeCharacter_${new Date().getTime()}.png`;
     console.log('html2canvas 캡처 완료:', filename);
     
     return new File([blob], filename, { type: 'image/png' });
   };
   
   // 색상 옵션 배열
-  const characterColors = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'white', 'black'];
+  const characterColors = ['pastel-blue', 'pastel-pink', 'pastel-green', 'pastel-yellow', 'pastel-purple'];
   const houseColors = ['brown', 'white', 'gray', 'blue', 'red', 'green'];
   const accessoryTypes = ['none', 'hat', 'glasses', 'necklace'];
   const houseStyles = ['modern', 'classic', 'cottage', 'castle', 'futuristic'];
@@ -243,28 +184,43 @@ const AppContent: React.FC = () => {
       const imageBackupUrl = `${BACKUP_IPFS_GATEWAY}${imageHash}`;
       const imageInfuraUrl = `${INFURA_IPFS_GATEWAY}${imageHash}`;
       
-      // 캐릭터와 집 속성을 메타데이터로 구성 - MetaMask 호환 형식으로 단순화
-      const characterName = `블록 캐릭터 #${Math.floor(Math.random() * 10000)}`;
+      // 이미지가 실제로 접근 가능한지 바로 확인 (디버깅용)
+      try {
+        console.log('이미지 접근성 검증 중...');
+        const checkResponse = await fetch(imageHttpUrl, { method: 'HEAD' });
+        if (checkResponse.ok) {
+          console.log('✅ 이미지가 게이트웨이에서 즉시 접근 가능함:', imageHttpUrl);
+        } else {
+          console.warn(`⚠️ 이미지가 게이트웨이에서 접근할 수 없음 (상태: ${checkResponse.status})`);
+          
+          // 백업 게이트웨이 시도
+          try {
+            const backupResponse = await fetch(imageBackupUrl, { method: 'HEAD' });
+            if (backupResponse.ok) {
+              console.log('✅ 백업 게이트웨이에서 이미지 접근 가능:', imageBackupUrl);
+            } else {
+              console.warn('⚠️ 백업 게이트웨이에서도 이미지 접근 불가');
+            }
+          } catch (err) {
+            console.warn('백업 게이트웨이 접근 시도 중 오류:', err);
+          }
+        }
+      } catch (err) {
+        console.warn('이미지 접근성 검증 중 오류:', err);
+      }
       
-      // MetaMask에서 이미지가 표시되도록 HTTP URL을 사용
+      // 캐릭터와 집 속성을 메타데이터로 구성 - MetaMask 호환 형식으로 단순화
+      const characterName = `슬라임 캐릭터 #${Math.floor(Math.random() * 10000)}`;
+      
+      // NFT 표준 메타데이터 형식 사용 - 슬라임 캐릭터에 맞게 간소화
       const metadata = {
         name: characterName, 
-        description: `${characterName}은(는) ${houseStyle} 스타일의 집에 살고 있는 블록 캐릭터입니다.`,
-        image: imageHttpUrl,      // HTTP URL 사용 (MetaMask 호환성)
-        image_url: imageHttpUrl,  // OpenSea 호환성
-        external_url: null,
+        description: `${characterName}은(는) 귀여운 슬라임 NFT 캐릭터입니다. 캐릭터 색상: ${characterColor}`,
+        image: imageIpfsUrl,      // 표준 형식 (ipfs://)
         attributes: [
           { trait_type: '캐릭터 색상', value: characterColor },
-          { trait_type: '액세서리', value: accessory },
-          { trait_type: '액세서리 색상', value: accessoryColor },
-          { trait_type: '집 스타일', value: houseStyle },
-          { trait_type: '집 색상', value: houseColor },
-          { trait_type: '장식 수', value: decorations.length }
-        ],
-        // 대체 URL 제공
-        image_ipfs: imageIpfsUrl,
-        image_ipfs_io: imageBackupUrl,
-        image_infura: imageInfuraUrl
+          { trait_type: '레벨', value: level }
+        ]
       };
       
       console.log('메타데이터 생성 완료:', JSON.stringify(metadata, null, 2));
@@ -274,7 +230,7 @@ const AppContent: React.FC = () => {
       const metadataUrl = await uploadMetadataToIPFS(
         metadata.name,
         metadata.description,
-        imageHttpUrl, // HTTP URL 전달 (MetaMask 호환성 위해)
+        imageIpfsUrl,
         metadata.attributes
       );
       console.log('메타데이터 업로드 완료, URL:', metadataUrl);
@@ -401,68 +357,99 @@ const AppContent: React.FC = () => {
     }
   };
   
-  // 캐릭터 표현식에 따른 표정 조절 (BlockCharacter 컴포넌트에 전달)
-  const getExpressionProps = (expression: string) => {
-    switch(expression) {
-      case 'happy': return { eyes: 'round' as const, mouth: 'smile' as const };
-      case 'sad': return { eyes: 'round' as const, mouth: 'frown' as const };
-      case 'angry': return { eyes: 'narrow' as const, mouth: 'frown' as const };
-      case 'surprised': return { eyes: 'wide' as const, mouth: 'o' as const };
-      case 'neutral': return { eyes: 'normal' as const, mouth: 'straight' as const };
-      default: return { eyes: 'round' as const, mouth: 'smile' as const };
-    }
-  };
-
-  // 땅 스타일에 따른 색상 가져오기
-  const getGroundColor = (style: string): string => {
-    switch(style) {
-      case 'grass': return '#567d46';  // 풀
-      case 'dirt': return '#8b7355';   // 흙
-      case 'sand': return '#c2b280';   // 모래
-      case 'snow': return '#f8f8ff';   // 눈
-      case 'stone': return '#a9a9a9';  // 돌
-      default: return '#8b7355';
-    }
-  };
-
   // 환경 설정에 따른 속성 가져오기
   const getEnvironmentProps = () => {
     switch(timeOfDay) {
       case 'day': 
         return { 
-          ambientLight: 0.7, 
-          directionalLight: 1.0, 
-          directionalLightColor: '#ffffff',
           backgroundColor: '#87CEEB' 
         };
       case 'sunset': 
         return { 
-          ambientLight: 0.5, 
-          directionalLight: 0.8, 
-          directionalLightColor: '#FF7E00',
           backgroundColor: '#FFA07A' 
         };
       case 'night': 
         return { 
-          ambientLight: 0.2, 
-          directionalLight: 0.1, 
-          directionalLightColor: '#3A3A9E',
           backgroundColor: '#191970' 
         };
       default: 
         return { 
-          ambientLight: 0.7, 
-          directionalLight: 1.0, 
-          directionalLightColor: '#ffffff',
           backgroundColor: '#87CEEB' 
         };
     }
   };
 
   const environmentProps = getEnvironmentProps();
-  const expressionProps = getExpressionProps(expression);
-  // 땅 색상 계산
-  const groundColor = getGroundColor(groundStyle);
+  
+  // 경험치 획득 함수
+  const gainExperience = (amount: number) => {
+    const newExperience = experience + amount;
+    
+    // 경험치 획득 애니메이션 표시
+    setExpGainAmount(amount);
+    setShowExpGain(true);
+    setTimeout(() => {
+      setShowExpGain(false);
+    }, 1500);
+    
+    if (newExperience >= expNeededForNextLevel) {
+      // 레벨업
+      setLevel(level + 1);
+      setExperience(newExperience - expNeededForNextLevel);
+    } else {
+      setExperience(newExperience);
+    }
+  };
+  
+  // 슬라임 쓰다듬기 함수
+  const petSlime = () => {
+    if (petCount < maxTaskCount && !isPetting) {
+      // 쓰다듬기 애니메이션 시작
+      setIsPetting(true);
+      
+      // 애니메이션 종료 후 카운터 증가
+      setTimeout(() => {
+        const newPetCount = petCount + 1;
+        setPetCount(newPetCount);
+        
+        // 애니메이션 상태 초기화
+        setIsPetting(false);
+        
+        // 미션 완료시에만 경험치 획득
+        if (newPetCount === maxTaskCount) {
+          gainExperience(60); // 쓰다듬기 미션 완료시 60 경험치 획득
+        }
+      }, 300);
+    }
+  };
+  
+  // 먹이주기 함수
+  const feedSlime = () => {
+    if (feedCount < maxTaskCount && !isFeeding) {
+      // 먹이 표시
+      setShowFood(true);
+      
+      // 먹이주기 애니메이션 시작
+      setTimeout(() => {
+        setIsFeeding(true);
+        setShowFood(false);
+        
+        // 애니메이션 종료 후 카운터 증가
+        setTimeout(() => {
+          const newFeedCount = feedCount + 1;
+          setFeedCount(newFeedCount);
+          
+          // 애니메이션 상태 초기화
+          setIsFeeding(false);
+          
+          // 미션 완료시에만 경험치 획득
+          if (newFeedCount === maxTaskCount) {
+            gainExperience(90); // 먹이주기 미션 완료시 90 경험치 획득
+          }
+        }, 800);
+      }, 500);
+    }
+  };
 
   // NFT 캡처 모달 열기
   const openCaptureModal = () => {
@@ -481,7 +468,11 @@ const AppContent: React.FC = () => {
   return (
     <div className="game-page">
       <header className="game-header">
-        <h1>NFT 발행 테스트</h1>
+        <h1>Slime Raise</h1>
+        <div className="currency-display">
+          <img src="/coin.png" alt="Coin" className="currency-icon" />
+          <span className="currency-value">10</span>
+        </div>
         {isConnected ? (
           <div className="wallet-info">
             <div className="wallet-indicator"></div>
@@ -489,86 +480,48 @@ const AppContent: React.FC = () => {
           </div>
         ) : (
           <button 
-            className="connect-wallet-button" 
-            onClick={connectWallet} 
+            className="connect-wallet-button"
+            onClick={connectWallet}
             disabled={isConnecting}
           >
             {isConnecting ? '연결 중...' : '지갑 연결'}
           </button>
         )}
       </header>
-
+      
       <main className="game-content">
         <div className="game-scene" ref={gameSceneRef} style={{ background: environmentProps.backgroundColor }}>
-          <Canvas ref={canvasRef}>
-            {/* Three.js 캡처 컴포넌트 */}
-            <SceneCapture onCaptureRef={handleCaptureRef} />
-            
-            {/* 조명 설정 - 환경에 따라 조절 */}
-            <ambientLight intensity={environmentProps.ambientLight} />
-            <directionalLight 
-              position={[10, 10, 5]} 
-              intensity={environmentProps.directionalLight} 
-              color={environmentProps.directionalLightColor}
+          <div className="slime-image-container">
+            <img 
+              src="/slimeD.gif" 
+              alt="Slime Character" 
+              className={`slime-image ${isPetting ? 'petting' : ''} ${isFeeding ? 'feeding' : ''} slime-${characterColor}`}
+              onClick={petSlime}
+              style={{ cursor: petCount >= maxTaskCount ? 'default' : 'pointer' }}
             />
-            
-            {/* 카메라 컨트롤 */}
-            <OrbitControls 
-              enableZoom={true} 
-              enablePan={false}
-              minDistance={4}
-              maxDistance={12}
-              maxPolarAngle={Math.PI / 2}
-              target={[0, 0, 0]}
-              makeDefault
-            />
-            
-            {/* 기본 카메라 설정 - 정면에서 약간 위에서 보는 각도 */}
-            <PerspectiveCamera 
-              makeDefault 
-              position={[0, 2, 8]} 
-              fov={45}
-            />
-            
-            {/* 환경 효과 추가 - 날씨에 따라 조절 */}
-            {weather === 'rainy' && <RainEffect />}
-            {weather === 'snowy' && <SnowEffect />}
-            {weather === 'foggy' && <FogEffect />}
-            
-            {/* 바닥/땅 추가 - 스타일 적용 */}
-            <Ground 
-              color={groundStyle === 'snow' && timeOfDay === 'night' ? '#e6e6fa' : groundColor} 
-              position={[0, -0.5, 0]} 
-            />
-            
-            {/* 캐릭터 - 위치 조정 */}
-            <BlockCharacter 
-              color={characterColor}
-              accessory={accessory}
-              accessoryColor={accessoryColor}
-              position={[2.5, 0, 0.5]}
-              scale={0.8}
-              rotation={[0, -Math.PI / 6, 0]}
-              style={characterStyle}
-              expression={expressionProps}
-            />
-            
-            {/* 집 - 위치 조정 */}
-            <BlockHouse 
-              style={houseStyle}
-              color={houseColor}
-              size="medium"
-              decorations={decorations as Decoration[]}
-              position={[-2.5, 0, -1]}
-              rotation={[0, Math.PI / 4, 0]}
-            />
-          </Canvas>
+            {showFood && (
+              <div className="food-item"></div>
+            )}
+            {showExpGain && (
+              <div className="exp-gain-animation">
+                +{expGainAmount} EXP
+              </div>
+            )}
+            <button 
+              className="feed-button" 
+              onClick={feedSlime} 
+              disabled={feedCount >= maxTaskCount || isFeeding}
+            >
+              먹이주기
+            </button>
+          </div>
         </div>
         
         <div className="customization-container">
           <div className="customization-panel">
-            <div className="panel-header">
-              <h2>커스텀</h2>
+            <div className="character-level">LV.{level}</div>
+            <div className="level-progress-container">
+              <div className="level-progress-bar" style={{ width: `${expProgress}%` }}></div>
             </div>
             
             <div className="tabs">
@@ -576,106 +529,61 @@ const AppContent: React.FC = () => {
                 className={`tab-button ${activeTab === 'character' ? 'active' : ''}`}
                 onClick={() => setActiveTab('character')}
               >
-                캐릭터
+                Misson
               </button>
               <button
                 className={`tab-button ${activeTab === 'house' ? 'active' : ''}`}
                 onClick={() => setActiveTab('house')}
               >
-                집
+                custom
               </button>
               <button
                 className={`tab-button ${activeTab === 'environment' ? 'active' : ''}`}
                 onClick={() => setActiveTab('environment')}
               >
-                환경
+                shop
               </button>
             </div>
             
             <div className="tab-content">
               {activeTab === 'character' ? (
                 <div className="character-customization">
-                  <div className="customization-section">
-                    <h3>색상</h3>
-                    <div className="color-options">
-                      {characterColors.map((color) => (
-                        <div
-                          key={color}
-                          className={`color-option ${characterColor === color ? 'selected' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setCharacterColor(color as any)}
-                          title={color}
-                        />
-                      ))}
+                  {/* 미션들을 상태에 따라 정렬 - 완료되지 않은 미션을 먼저 표시 */}
+                  {petCount < maxTaskCount && (
+                    <div className="task-container">
+                      <div className="task-content">
+                        <div className="task-title">슬라임 세 번 쓰다듬기</div>
+                        <div className="task-progress">{petCount} / {maxTaskCount}</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="customization-section">
-                    <h3>스타일</h3>
-                    <div className="style-options">
-                      {characterStyles.map((style) => (
-                        <button
-                          key={style}
-                          className={`style-option ${characterStyle === style ? 'selected' : ''}`}
-                          onClick={() => setCharacterStyle(style as any)}
-                        >
-                          {style === 'normal' ? '기본형' : 
-                           style === 'slim' ? '슬림형' : 
-                           style === 'chubby' ? '통통형' : '키 큰형'}
-                        </button>
-                      ))}
+                  {feedCount < maxTaskCount && (
+                    <div className="task-container">
+                      <div className="task-content">
+                        <div className="task-title">먹이주기</div>
+                        <div className="task-progress">{feedCount} / {maxTaskCount}</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="customization-section">
-                    <h3>표정</h3>
-                    <div className="expression-options">
-                      {expressionTypes.map((expr) => (
-                        <button
-                          key={expr}
-                          className={`expression-option ${expression === expr ? 'selected' : ''}`}
-                          onClick={() => setExpression(expr as any)}
-                          value={expr}
-                        >
-                          {expr === 'happy' ? '행복' : 
-                           expr === 'sad' ? '슬픔' : 
-                           expr === 'angry' ? '화남' :
-                           expr === 'surprised' ? '놀람' : '무표정'}
-                        </button>
-                      ))}
+                  {/* 완료된 미션들 - 아래에 표시 */}
+                  {petCount >= maxTaskCount && (
+                    <div className="task-container completed">
+                      <div className="task-content">
+                        <div className="task-title">슬라임 세 번 쓰다듬기</div>
+                        <div className="task-progress">{petCount} / {maxTaskCount}</div>
+                        <div className="task-complete-badge">완료</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="customization-section">
-                    <h3>액세서리</h3>
-                    <div className="accessory-options">
-                      {accessoryTypes.map((type) => (
-                        <button
-                          key={type}
-                          className={`accessory-option ${accessory === type ? 'selected' : ''}`}
-                          onClick={() => setAccessory(type as any)}
-                        >
-                          {type === 'none' ? '없음' : 
-                           type === 'hat' ? '모자' : 
-                           type === 'glasses' ? '안경' : '목걸이'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  {accessory !== 'none' && (
-                    <div className="customization-section">
-                      <h3>액세서리 색상</h3>
-                      <div className="color-options">
-                        {characterColors.map((color) => (
-                          <div
-                            key={color}
-                            className={`color-option ${accessoryColor === color ? 'selected' : ''}`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => setAccessoryColor(color as any)}
-                            title={color}
-                          />
-                        ))}
+                  {feedCount >= maxTaskCount && (
+                    <div className="task-container completed">
+                      <div className="task-content">
+                        <div className="task-title">먹이주기</div>
+                        <div className="task-progress">{feedCount} / {maxTaskCount}</div>
+                        <div className="task-complete-badge">완료</div>
                       </div>
                     </div>
                   )}
@@ -683,59 +591,22 @@ const AppContent: React.FC = () => {
               ) : activeTab === 'house' ? (
                 <div className="house-customization">
                   <div className="customization-section">
-                    <h3>집 스타일</h3>
-                    <div className="style-options">
-                      {houseStyles.map((style) => (
-                        <button
-                          key={style}
-                          className={`style-option ${houseStyle === style ? 'selected' : ''}`}
-                          onClick={() => setHouseStyle(style as any)}
-                        >
-                          {style === 'modern' ? '모던' : 
-                           style === 'classic' ? '클래식' : 
-                           style === 'cottage' ? '코티지' :
-                           style === 'castle' ? '성' : '미래적'}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>집 색상</h3>
-                    <div className="color-options">
-                      {houseColors.map((color) => (
-                        <div
-                          key={color}
-                          className={`color-option ${houseColor === color ? 'selected' : ''}`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setHouseColor(color as any)}
-                          title={color}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>장식품</h3>
-                    <div className="decoration-options">
-                      {decorationOptions.map((decoration) => (
-                        <label key={decoration} className="decoration-option">
-                          <input
-                            type="checkbox"
-                            checked={decorations.includes(decoration)}
-                            onChange={() => toggleDecoration(decoration)}
+                    <h3>슬라임 색상</h3>
+                    <div className="color-selection-container">
+                      <div className="color-options">
+                        {characterColors.map((color) => (
+                          <div
+                            key={color}
+                            className={`color-option ${characterColor === color ? 'selected' : ''}`}
+                            style={{ backgroundColor: color }}
+                            onClick={() => setCharacterColor(color as any)}
+                            title={color}
                           />
-                          {decoration === 'garden' ? '정원' : 
-                           decoration === 'fence' ? '울타리' : 
-                           decoration === 'pool' ? '수영장' :
-                           decoration === 'trees' ? '나무' : '꽃'}
-                        </label>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="environment-customization">
+                  
                   <div className="customization-section">
                     <h3>시간대</h3>
                     <div className="time-options">
@@ -752,63 +623,46 @@ const AppContent: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div className="environment-customization">
+                  <h3 className="shop-title">액세서리 상점</h3>
                   
-                  <div className="customization-section">
-                    <h3>날씨</h3>
-                    <div className="weather-options">
-                      {weatherOptions.map((type) => (
-                        <button
-                          key={type}
-                          className={`weather-option ${weather === type ? 'selected' : ''}`}
-                          onClick={() => setWeather(type as any)}
-                          value={type}
-                        >
-                          {type === 'clear' ? '맑음' : 
-                           type === 'rainy' ? '비' : 
-                           type === 'snowy' ? '눈' : '안개'}
-                        </button>
-                      ))}
+                  <div className="shop-items">
+                    <div className="shop-item">
+                      <div className="shop-item-image hat-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">모자</div>
+                        <div className="shop-item-price">50 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
                     </div>
-                  </div>
-                  
-                  <div className="customization-section">
-                    <h3>땅 스타일</h3>
-                    <div className="ground-options">
-                      <button 
-                        className={`ground-option ${groundStyle === 'grass' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('grass')}
-                        value="grass"
-                      >
-                        잔디
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'dirt' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('dirt')}
-                        value="dirt"
-                      >
-                        흙
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'sand' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('sand')}
-                        value="sand"
-                      >
-                        모래
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'snow' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('snow')}
-                        value="snow"
-                      >
-                        눈
-                      </button>
-                      <button 
-                        className={`ground-option ${groundStyle === 'stone' ? 'selected' : ''}`}
-                        onClick={() => setGroundStyle('stone')}
-                        value="stone"
-                      >
-                        돌
-                      </button>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image glasses-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">안경</div>
+                        <div className="shop-item-price">30 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
+                    </div>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image sword-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">픽셀 검</div>
+                        <div className="shop-item-price">100 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
+                    </div>
+                    
+                    <div className="shop-item">
+                      <div className="shop-item-image shield-item"></div>
+                      <div className="shop-item-info">
+                        <div className="shop-item-name">방패</div>
+                        <div className="shop-item-price">80 <img src="/coin.png" alt="코인" className="shop-coin-icon" /></div>
+                      </div>
+                      <button className="shop-buy-button">구매하기</button>
                     </div>
                   </div>
                 </div>
@@ -817,9 +671,15 @@ const AppContent: React.FC = () => {
           </div>
           
           <div className="panel-footer">
-            <button className="nft-button" onClick={openCaptureModal}>
-              NFT 발행하기
-            </button>
+            <div className="button-container">
+              <button 
+                className="nft-button" 
+                onClick={openCaptureModal} 
+                disabled={level < 1}
+              >
+                {level >= 1 ? 'NFT 발행하기' : 'LV.1이 되면 NFT를 발행할 수 있습니다'}
+              </button>
+            </div>
           </div>
         </div>
         
@@ -828,7 +688,7 @@ const AppContent: React.FC = () => {
           <div className="custom-modal">
             <div className="modal-content">
               <button className="close-button" onClick={closeCaptureModal}>×</button>
-              
+                
               <div className="modal-header">
                 <h2>NFT 발행</h2>
               </div>
@@ -874,17 +734,17 @@ const AppContent: React.FC = () => {
                   <div className="success-message">
                     <h3>민팅 성공!</h3>
                     <p>토큰 ID: {mintResult.tokenId}</p>
-                  </div>
+                </div>
                 )}
                 
                 {mintStatus === 'error' && (
-                  <div className="error-message">
+              <div className="error-message">
                     <h3>오류 발생</h3>
-                    <p>{mintResult?.error}</p>
-                  </div>
-                )}
+                <p>{mintResult?.error}</p>
               </div>
-            </div>
+            )}
+          </div>
+        </div>
           </div>
         )}
       </main>
@@ -898,7 +758,7 @@ const App: React.FC = () => {
     <Web3Provider>
       <GameProvider>
         <div className="app">
-          <AppContent />
+        <AppContent />
         </div>
       </GameProvider>
     </Web3Provider>

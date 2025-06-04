@@ -12,7 +12,7 @@ contract BlockCharacterNFT is ERC721URIStorage, Ownable {
     // 이벤트: NFT 민팅 시 발생
     event CharacterMinted(uint256 tokenId, address owner, string tokenURI);
     
-    constructor() ERC721("BlockCharacter", "BCHAR") {}
+    constructor() ERC721("BlockCharacter", "BCHAR") Ownable(msg.sender) {}
     
     // NFT 민팅 함수
     function mintCharacter(address player, string memory tokenURI) public returns (uint256) {

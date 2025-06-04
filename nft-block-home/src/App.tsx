@@ -5,9 +5,7 @@ import { GameProvider } from './context/GameContext';
 import html2canvas from 'html2canvas';
 import { uploadImageToIPFS, uploadMetadataToIPFS, PUBLIC_IPFS_GATEWAY, BACKUP_IPFS_GATEWAY, INFURA_IPFS_GATEWAY } from './utils/ipfs';
 import './styles.css';
-// 개발자 콘솔에서 환경변수 확인
-console.log(process.env.REACT_APP_PINATA_API_KEY);
-console.log(process.env.REACT_APP_PINATA_SECRET_API_KEY);
+
 // 실제 App 컴포넌트
 const AppContent: React.FC = () => {
   // 캐릭터 상태

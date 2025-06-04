@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import Web3 from 'web3';
 import { AbiItem } from 'web3-utils';
-import BlockNFTAbi from '../contracts/BlockNFT.json';
+import BlockCharacterNFT_ABI from '../contracts/BlockCharacterNFT_ABI.json';
 
 // Contract 타입 정의를 간소화합니다
 type Contract = any;
@@ -87,12 +87,12 @@ export const Web3Provider: React.FC<Web3ProviderProps> = ({ children }) => {
 
       // NFT 컨트랙트 연결
       if (NFT_CONTRACT_ADDRESS) {
-        console.log('ABI 타입:', typeof BlockNFTAbi);
-        console.log('ABI 구조:', BlockNFTAbi ? 'ABI 존재' : 'ABI 미존재');
+        console.log('ABI 타입:', typeof BlockCharacterNFT_ABI);
+        console.log('ABI 구조:', BlockCharacterNFT_ABI ? 'ABI 존재' : 'ABI 미존재');
         
         try {
           const _contract = new _web3.eth.Contract(
-            BlockNFTAbi as AbiItem[],
+            BlockCharacterNFT_ABI as AbiItem[],
             NFT_CONTRACT_ADDRESS
           );
           console.log('컨트랙트 초기화 성공:', Boolean(_contract));

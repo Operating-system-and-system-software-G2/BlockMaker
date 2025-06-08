@@ -2,8 +2,9 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useWeb3 } from './context/Web3Context';
 import { Web3Provider } from './context/Web3Context';
 import { GameProvider } from './context/GameContext';
-import html2canvas from 'html2canvas';
+import { domToPng } from 'modern-screenshot';
 import { uploadImageToIPFS, uploadMetadataToIPFS, PUBLIC_IPFS_GATEWAY, BACKUP_IPFS_GATEWAY, INFURA_IPFS_GATEWAY } from './utils/ipfs';
+import { chatWithSlime, getRandomSlimeReaction, ChatMessage } from './utils/chatgpt';
 import UnityGame from './components/UnityGame';
 import './styles.css';
 
@@ -78,6 +79,7 @@ const AppContent: React.FC = () => {
   // 게임 화면 참조
   const gameSceneRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null); // 채팅 입력창 ref 추가
   
   const [capturedPreview, setCapturedPreview] = useState<string | null>(null);
   
@@ -86,6 +88,13 @@ const AppContent: React.FC = () => {
   const [ownedDecorations, setOwnedDecorations] = useState<string[]>(['none']); // 소유한 꾸미기 아이템 목록
   const [placedDecorations, setPlacedDecorations] = useState<{id: string, type: string, x: number, y: number}[]>([]); // 배치된 구조물들
   const [placementMode, setPlacementMode] = useState<string | null>(null); // 현재 배치 모드 (어떤 구조물을 배치할지)
+  
+  // 채팅 상태
+  const [chatInput, setChatInput] = useState<string>('');
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [currentSlimeMessage, setCurrentSlimeMessage] = useState<string>('');
+  const [showSlimeMessage, setShowSlimeMessage] = useState<boolean>(false);
+  const [isSlimeTyping, setIsSlimeTyping] = useState<boolean>(false);
   
   // 이미지 캡처 함수
   const captureImage = async (): Promise<File> => {
@@ -386,25 +395,15 @@ const AppContent: React.FC = () => {
     }
     
     // 설정 수정: 고품질, 스케일 2배, 스크롤 없이 전체 캡처
-    const canvas = await html2canvas(gameSceneRef.current, {
-      useCORS: true, 
-      allowTaint: true,
+    const canvas = await domToPng(gameSceneRef.current, {
       scale: 2,
-      backgroundColor: null,
-      windowWidth: gameSceneRef.current.offsetWidth,
-      windowHeight: gameSceneRef.current.offsetHeight,
-      ignoreElements: (element) => {
-        // Unity 캔버스 외의 UI 요소들은 무시
-        return element.classList.contains('feeding-buttons') || 
-               element.classList.contains('currency-display') ||
-               element.classList.contains('wallet-info');
-      }
+      backgroundColor: null
     });
     
-    const imgData = canvas.toDataURL('image/png');
-    setCapturedPreview(imgData);
+    // domToPng는 이미 data URL을 반환하므로 직접 사용
+    setCapturedPreview(canvas);
     
-    const res = await fetch(imgData);
+    const res = await fetch(canvas);
     const blob = await res.blob();
     const filename = `BlockCharacter_html2canvas_${new Date().getTime()}.png`;
     console.log('html2canvas 캡처 완료:', filename);
@@ -709,6 +708,9 @@ const AppContent: React.FC = () => {
       setLevel(newLevel);
       setExperience(newExperience - expNeededForNextLevel);
       
+      // 레벨업 시 슬라임 기쁨 표현 추가
+      triggerSlimeReaction('happy');
+      
       // 레벨업 시 Unity 터치를 활성화
       console.log('Unity 터치 활성화 중...');
       setTimeout(() => {
@@ -772,6 +774,9 @@ const AppContent: React.FC = () => {
       // 먹이 표시
       setShowFood(true);
       
+      // 슬라임 반응 (먹이를 받을 때)
+      triggerSlimeReaction('excited');
+      
       // 먹이주기 애니메이션 시작
       setTimeout(() => {
         setIsFeeding(true);
@@ -789,6 +794,7 @@ const AppContent: React.FC = () => {
           if (newFeedCount === maxTaskCount) {
             gainExperience(90); // 먹이주기 미션 완료시 90 경험치 획득
             setCoins(coins + 30); // 미션 완료 보상으로 코인 30개 지급
+            triggerSlimeReaction('happy'); // 미션 완료 기쁨 표현
           }
         }, 800);
       }, 500);
@@ -800,6 +806,9 @@ const AppContent: React.FC = () => {
     if (feed2Count < maxTaskCount && !isFeeding2) {
       // 특별 간식 표시
       setShowFood2(true);
+      
+      // 슬라임 반응 (특별 간식을 받을 때)
+      triggerSlimeReaction('excited');
       
       // 특별 간식 주기 애니메이션 시작
       setTimeout(() => {
@@ -818,6 +827,7 @@ const AppContent: React.FC = () => {
           if (newFeed2Count === maxTaskCount) {
             gainExperience(100); // 특별 간식 미션 완료시 100 경험치 획득
             setCoins(coins + 40); // 미션 완료 보상으로 코인 40개 지급
+            triggerSlimeReaction('happy'); // 미션 완료 기쁨 표현
           }
         }, 800);
       }, 500);
@@ -829,6 +839,9 @@ const AppContent: React.FC = () => {
     if (feed3Count < maxTaskCount && !isFeeding3) {
       // 과일 표시
       setShowFood3(true);
+      
+      // 슬라임 반응 (과일을 받을 때)
+      triggerSlimeReaction('excited');
       
       // 과일 주기 애니메이션 시작
       setTimeout(() => {
@@ -847,6 +860,7 @@ const AppContent: React.FC = () => {
           if (newFeed3Count === maxTaskCount) {
             gainExperience(120); // 과일 주기 미션 완료시 120 경험치 획득
             setCoins(coins + 50); // 미션 완료 보상으로 코인 50개 지급
+            triggerSlimeReaction('happy'); // 미션 완료 기쁨 표현
           }
         }, 800);
       }, 500);
@@ -858,6 +872,9 @@ const AppContent: React.FC = () => {
     if (feed4Count < maxTaskCount && !isFeeding4) {
       // 보너스 먹이 표시
       setShowFood4(true);
+      
+      // 슬라임 반응 (보너스 먹이를 받을 때)
+      triggerSlimeReaction('excited');
       
       // 보너스 먹이 주기 애니메이션 시작
       setTimeout(() => {
@@ -876,6 +893,7 @@ const AppContent: React.FC = () => {
           if (newFeed4Count === maxTaskCount) {
             gainExperience(150); // 보너스 먹이 미션 완료시 150 경험치 획득
             setCoins(coins + 60); // 미션 완료 보상으로 코인 60개 지급
+            triggerSlimeReaction('happy'); // 미션 완료 기쁨 표현
           }
         }, 800);
       }, 500);
@@ -936,6 +954,76 @@ const AppContent: React.FC = () => {
       setPlacementMode(null); // 배치 후 모드 해제
     }
   };
+
+  // 채팅 메시지 전송 함수 - 단순화
+  const handleSendChatMessage = async () => {
+    if (!chatInput.trim() || isSlimeTyping) return;
+    
+    const userMessage = chatInput.trim();
+    setChatInput(''); // 입력창 비우기
+    setIsSlimeTyping(true);
+    
+    // 사용자 메시지를 히스토리에 추가
+    const newChatHistory = [...chatHistory, { role: 'user' as const, content: userMessage }];
+    setChatHistory(newChatHistory);
+    
+    try {
+      // ChatGPT API 호출
+      const slimeResponse = await chatWithSlime(
+        userMessage, 
+        characterColor, 
+        level, 
+        newChatHistory.slice(-6) // 최근 6개 메시지만 컨텍스트로 전달
+      );
+      
+      // 슬라임 응답을 히스토리에 추가
+      setChatHistory(prev => [...prev, { role: 'assistant', content: slimeResponse }]);
+      
+      // 슬라임 메시지 화면에 표시
+      displaySlimeMessage(slimeResponse);
+      
+    } catch (error) {
+      console.error('채팅 오류:', error);
+      const fallbackMessage = getRandomSlimeReaction('sleepy');
+      displaySlimeMessage(fallbackMessage);
+    } finally {
+      setIsSlimeTyping(false);
+    }
+  };
+  
+  // 슬라임 메시지 화면에 표시하는 함수
+  const displaySlimeMessage = (message: string) => {
+    setCurrentSlimeMessage(message);
+    setShowSlimeMessage(true);
+    
+    // 3초 후에 메시지 숨기기
+    setTimeout(() => {
+      setShowSlimeMessage(false);
+    }, 3000);
+  };
+  
+  // 채팅 입력 핸들러 - Controlled Component로 통일
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setChatInput(e.target.value);
+  };
+
+  // 엔터키 핸들러 - 단순화
+  const handleChatKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleSendChatMessage();
+    }
+  };
+
+  // 특정 행동에 따른 랜덤 슬라임 반응
+  const triggerSlimeReaction = (emotion: 'happy' | 'excited' | 'sleepy' | 'hungry') => {
+    if (!isSlimeTyping && !showSlimeMessage) {
+      const reaction = getRandomSlimeReaction(emotion);
+      displaySlimeMessage(reaction);
+    }
+  };
+
+
 
   return (
     <div className="game-page">
@@ -1014,6 +1102,30 @@ const AppContent: React.FC = () => {
               </div>
             )}
             
+            {/* 슬라임 채팅 메시지 표시 (슬라임 상단 가운데) */}
+            {showSlimeMessage && (
+              <div className="slime-message-bubble">
+                <div className="slime-message-content">
+                  {currentSlimeMessage}
+                </div>
+                <div className="slime-message-tail"></div>
+              </div>
+            )}
+            
+            {/* 슬라임 입력 중 표시 */}
+            {isSlimeTyping && (
+              <div className="slime-typing-indicator">
+                <div className="slime-typing-content">
+                  <span>푸니...</span>
+                  <div className="typing-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {/* 먹이주기 버튼들 */}
             <div className="feeding-buttons">
               <button 
@@ -1058,6 +1170,45 @@ const AppContent: React.FC = () => {
         <div className="customization-container">
           <div className="customization-panel">
             <div className="character-level">LV.{level}</div>
+            
+            {/* 슬라임 채팅 인풋 (레벨바 상단) */}
+            <div className="slime-chat-input-container">
+              <div className="chat-input-wrapper">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={handleChatInputChange}
+                  onKeyDown={handleChatKeyDown}
+                  placeholder="슬라임과 대화해보세요..."
+                  className="slime-chat-input"
+                  disabled={isSlimeTyping}
+                  maxLength={100}
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={{
+                    userSelect: 'text',
+                    WebkitUserSelect: 'text',
+                    MozUserSelect: 'text',
+                    msUserSelect: 'text',
+                    pointerEvents: 'auto',
+                    outline: 'none',
+                    backgroundColor: 'white',
+                    color: 'black',
+                    border: '2px solid #000',
+                    padding: '8px 12px',
+                    fontSize: '14px'
+                  }}
+                />
+                <button
+                  onClick={handleSendChatMessage}
+                  disabled={isSlimeTyping}
+                  className="chat-send-button"
+                >
+                  {isSlimeTyping ? '💭' : '💬'}
+                </button>
+              </div>
+            </div>
+            
             <div className="level-progress-container">
               <div className="level-progress-bar" style={{ width: `${expProgress}%` }}></div>
             </div>
